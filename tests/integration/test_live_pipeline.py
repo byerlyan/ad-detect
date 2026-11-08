@@ -1,6 +1,9 @@
 import struct
 from collections.abc import Sequence
+from pathlib import Path
+from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from ad_detect.app import FeatureDecisionProcessor, LiveShadowPipeline
@@ -76,6 +79,70 @@ async def test_feature_processor_persists_causal_shadow_decisions_and_gaps() -> 
         assert sum(event.kind == "detector.evidence" for event in events) == 3
         assert sum(event.kind == "decision" for event in events) == 3
         assert any(event.kind == "capture.gap" for event in events)
+
+
+@pytest.mark.asyncio
+async def test_feature_processor_fuses_ml_evidence_in_shadow_without_actuation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeModel:
+        aggregation_schema = "aggregate-v1:classical-v1"
+        columns = ("w1.audio.rms.mean",)
+        classes = tuple(item.value for item in Classification)
+        modality = SimpleNamespace(value="multimodal")
+        algorithm = SimpleNamespace(value="test-model")
+        calibration_method = "test"
+
+        def predict_proba(self, matrix: np.ndarray) -> np.ndarray:
+            return np.tile(np.asarray([[0.0, 1.0, 0.0]]), (len(matrix), 1))
+
+    monkeypatch.setattr(
+        "ad_detect.app.live.load_model_bundle",
+        lambda path, expected_feature_schema: (
+            FakeModel(),
+            SimpleNamespace(digest="model-digest"),
+        ),
+    )
+    document = _settings().model_dump(mode="python")
+    document["ml"] = {
+        "enabled": True,
+        "aggregation_schema": "aggregate-v1",
+        "inference_timeout_ms": 200,
+        "active_model_path": Path("models/candidates/example"),
+    }
+    settings = Settings.model_validate(document)
+
+    with SQLiteStore(":memory:") as store:
+        processor = FeatureDecisionProcessor(settings, store, session_id="live-test")
+        await processor.start()
+        decisions = []
+        for record in (
+            _audio(0, 100_000_000),
+            _video(1, 200_000_000),
+            _audio(2, 1_100_000_000),
+            _video(3, 1_200_000_000),
+            _audio(4, 2_100_000_000),
+            _video(5, 2_200_000_000),
+        ):
+            decisions.extend(await processor.process(record))
+        await processor.stop()
+
+        evidence_events = [
+            event
+            for event in store.timeline(session_id="live-test")
+            if event.kind == "detector.evidence"
+        ]
+        decision_events = [
+            event for event in store.timeline(session_id="live-test") if event.kind == "decision"
+        ]
+
+        assert len(evidence_events) == 4
+        assert (
+            sum(event.payload["detector_id"] == "ml-multimodal" for event in evidence_events) == 2
+        )
+        assert len(decision_events) == 2
+        assert any("ml-multimodal contribution" in reason for reason in decisions[-1].reasons)
+        assert all(decision.action is RecommendedAction.NONE for decision in decisions)
 
 
 class FakeCaptureSource:

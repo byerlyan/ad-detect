@@ -1,5 +1,12 @@
 """Interchangeable evidence producers."""
 
+from .fingerprint import FingerprintDetector, FingerprintQueryIndex
 from .rules import RulesDetector
+from .sklearn_model import SklearnModelDetector
 
-__all__ = ["RulesDetector"]
+__all__ = [
+    "FingerprintDetector",
+    "FingerprintQueryIndex",
+    "RulesDetector",
+    "SklearnModelDetector",
+]

@@ -1,9 +1,10 @@
-"""Safe live capture composition for the rules-only shadow baseline."""
+"""Safe live capture composition for passive multimodal shadow fusion."""
 
 from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
 from ad_detect.capture import (
@@ -16,10 +17,19 @@ from ad_detect.capture import (
 )
 from ad_detect.config import Settings
 from ad_detect.data import SQLiteStore
-from ad_detect.detectors import RulesDetector
-from ad_detect.domain import Decision, DetectorEvidence, OperatingMode
+from ad_detect.detectors import FingerprintDetector, RulesDetector, SklearnModelDetector
+from ad_detect.domain import (
+    Decision,
+    DetectorEvidence,
+    FeatureWindow,
+    FingerprintStatus,
+    OperatingMode,
+)
 from ad_detect.features import ClassicalFeatureExtractor, WindowAssembler
+from ad_detect.fingerprint import RollingFingerprintWindows, SQLiteFingerprintIndex
 from ad_detect.intervention import SimulatedIntervention
+from ad_detect.learning.aggregation import aggregate_feature_windows
+from ad_detect.learning.model import load_model_bundle
 
 from .runtime import DetectionRuntime
 
@@ -98,6 +108,38 @@ class FeatureDecisionProcessor:
             settings.rules,
             feature_schema=settings.features.schema_version,
         )
+        self._fingerprint_index = SQLiteFingerprintIndex(store, settings.fingerprint)
+        self._fingerprint_detector = FingerprintDetector(
+            self._fingerprint_index, settings.fingerprint
+        )
+        self._fingerprint_windows = RollingFingerprintWindows(
+            duration_ns=round(settings.fingerprint.query_window_seconds * 1_000_000_000)
+        )
+        self._feature_history: list[FeatureWindow] = []
+        self._aggregation_schema = settings.ml.aggregation_schema
+        self._ml_detector: SklearnModelDetector | None = None
+        if settings.ml.enabled:
+            active_model_path = settings.ml.active_model_path
+            if settings.ml.use_registry:
+                registered = store.active_model()
+                if registered is None:
+                    raise ValueError("ML registry selection requires an active registered model")
+                active_model_path = Path(registered.bundle_path)
+            assert active_model_path is not None
+            model, manifest = load_model_bundle(
+                active_model_path,
+                expected_feature_schema=settings.features.schema_version,
+            )
+            expected_aggregation = (
+                f"{settings.ml.aggregation_schema}:{settings.features.schema_version}"
+            )
+            if model.aggregation_schema != expected_aggregation:
+                raise ValueError("active model aggregation schema is incompatible")
+            self._ml_detector = SklearnModelDetector(
+                model,
+                model_digest=manifest.digest,
+                inference_timeout_ms=settings.ml.inference_timeout_ms,
+            )
         self._runtime = DetectionRuntime(
             safe_settings,
             store,
@@ -129,6 +171,9 @@ class FeatureDecisionProcessor:
     def mark_gap(self, *, at_ns: int, reason: str) -> None:
         self._assembler.mark_gap(reason)
         self._extractor.reset()
+        self._feature_history.clear()
+        self._fingerprint_windows.reset()
+        self._fingerprint_detector.reset()
         self.store.append_event(
             session_id=self.session_id,
             at_ns=at_ns,
@@ -151,14 +196,51 @@ class FeatureDecisionProcessor:
         for window in self._assembler.push(record):
             features = self._extractor.extract(window)
             self.store.save_feature_window(features)
+            self._feature_history.append(features)
+            history_cutoff = features.end_ns - 30_000_000_000
+            self._feature_history = [
+                item for item in self._feature_history if item.end_ns > history_cutoff
+            ]
             evidence = await self._detector.infer(features)
+            evidence_for_fusion = [evidence]
             self.store.append_event(
                 session_id=self.session_id,
                 at_ns=window.end_ns,
                 kind="detector.evidence",
                 payload=evidence_payload(evidence),
             )
-            decision = await self._runtime.process_evidence((evidence,), window.health)
+            if self._ml_detector is not None:
+                aggregated = aggregate_feature_windows(
+                    self._feature_history,
+                    schema_version=self._aggregation_schema,
+                )[-1]
+                ml_evidence = await self._ml_detector.infer(aggregated)
+                evidence_for_fusion.append(ml_evidence)
+                self.store.append_event(
+                    session_id=self.session_id,
+                    at_ns=window.end_ns,
+                    kind="detector.evidence",
+                    payload=evidence_payload(ml_evidence),
+                )
+            fingerprint_window = self._fingerprint_windows.push(window)
+            active_fingerprints = self.store.fingerprints(status=FingerprintStatus.ACTIVE)
+            if fingerprint_window is not None and active_fingerprints:
+                fingerprint_evidence = await self._fingerprint_detector.infer(
+                    fingerprint_window.audio,
+                    window_start_ns=fingerprint_window.start_ns,
+                    window_end_ns=fingerprint_window.end_ns,
+                    health=fingerprint_window.health,
+                )
+                evidence_for_fusion.append(fingerprint_evidence)
+                self.store.append_event(
+                    session_id=self.session_id,
+                    at_ns=window.end_ns,
+                    kind="detector.evidence",
+                    payload=evidence_payload(fingerprint_evidence),
+                )
+            elif not window.health.valid or not active_fingerprints:
+                self._fingerprint_detector.reset()
+            decision = await self._runtime.process_evidence(evidence_for_fusion, window.health)
             self._windows_processed += 1
             self._last_decision = decision
             decisions.append(decision)

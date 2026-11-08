@@ -50,7 +50,7 @@ ad-detect = "ad_detect.__main__:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-ad_detect = ["api/static/*.html"]
+ad_detect = ["api/static/*"]
 
 [tool.pytest.ini_options]
 addopts = "-q"
@@ -58,6 +58,7 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 filterwarnings = [
   "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+  "ignore:Could not find the number of physical cores:UserWarning",
 ]
 
 [tool.ruff]

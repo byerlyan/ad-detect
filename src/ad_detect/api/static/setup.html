@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="description" content="Guided local setup for Ad Detect">
+    <title>Set up Ad Detect</title>
+    <link rel="stylesheet" href="/static/setup.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Ad Detect dashboard">
+        <span class="brand-mark" aria-hidden="true">AD</span>
+        <span>Ad Detect</span>
+      </a>
+      <span id="connection" class="connection">Connecting…</span>
+    </header>
+
+    <main class="shell">
+      <aside class="rail" aria-label="Setup progress">
+        <p class="eyebrow">Local setup</p>
+        <h1>Make the signal trustworthy.</h1>
+        <p class="lede">Nine short checks. Nothing controls playback until capture, recovery, and consent are proven.</p>
+        <ol id="steps" class="steps"></ol>
+        <div class="privacy-note">
+          <strong>Private by default</strong>
+          <span>Probes and pairing stay on this Mac. Credentials never enter browser storage.</span>
+        </div>
+      </aside>
+
+      <section class="workspace" aria-live="polite">
+        <div id="notice" class="notice" role="status" hidden></div>
+
+        <article class="panel" data-step="welcome">
+          <p class="kicker">01 / Orientation</p>
+          <h2>Detect commercials without guessing through a broken signal.</h2>
+          <p>Ad Detect processes capture locally and classifies every interval as program, commercial, or unknown. Black frames, missing audio, stale data, and protected content become <strong>unknown</strong>—never positive ad evidence.</p>
+          <div class="callouts">
+            <div><span>Detection-only</span><p>Observe and label. Never change volume.</p></div>
+            <div><span>Shadow</span><p>Record hypothetical actions without controlling playback.</p></div>
+            <div><span>Automatic</span><p>Locked until shadow and restoration safety are verified.</p></div>
+          </div>
+          <button class="primary" data-action="welcome">I understand — begin setup</button>
+        </article>
+
+        <article class="panel" data-step="video">
+          <p class="kicker">02–03 / Capture</p>
+          <h2>Choose one synchronized video and audio path.</h2>
+          <p>Discovery comes from FFmpeg’s AVFoundation view. Select exact devices; ambiguous names are rejected rather than guessed.</p>
+          <div class="button-row"><button class="secondary" data-action="discover-capture">Discover devices</button></div>
+          <div class="form-grid">
+            <label>Video device<select id="video-device"><option value="">Discover first</option></select></label>
+            <label>Audio device<select id="audio-device"><option value="">Discover first</option></select></label>
+          </div>
+          <button class="primary" data-action="probe-capture">Save selection and run A/V probe</button>
+          <pre id="capture-result" class="result" hidden></pre>
+        </article>
+
+        <article class="panel" data-step="audio">
+          <p class="kicker">03 / Audio</p>
+          <h2>Complete the synchronized A/V probe.</h2>
+          <p>The same bounded probe must negotiate both streams. Return to the capture selection if audio is unavailable or timestamps cannot be trusted.</p>
+          <button class="primary" data-action="probe-capture">Run A/V probe again</button>
+          <pre id="audio-result" class="result" hidden></pre>
+        </article>
+
+        <article class="panel" data-step="apple_tv">
+          <p class="kicker">04 / Intervention</p>
+          <h2>Pair an Apple TV—or keep detection independent.</h2>
+          <p>Pairing credentials are written only by the backend with user-only permissions. Skip this step for detection-only or shadow operation.</p>
+          <div class="button-row">
+            <button class="secondary" data-action="discover-appletv">Discover Apple TVs</button>
+            <button class="quiet" data-action="skip-appletv">Skip with shadow-only setup</button>
+          </div>
+          <div id="appletv-list" class="device-list"></div>
+          <div id="pairing" class="pairing" hidden>
+            <label>PIN shown for pairing<input id="pairing-pin" inputmode="numeric" autocomplete="one-time-code"></label>
+            <button class="primary" data-action="finish-pairing">Finish pairing</button>
+          </div>
+        </article>
+
+        <article class="panel" data-step="mode">
+          <p class="kicker">05 / Operating mode</p>
+          <h2>Start conservatively.</h2>
+          <div class="mode-grid">
+            <label><input type="radio" name="mode" value="detection_only"> <span><strong>Detection-only</strong>Classify and collect labels.</span></label>
+            <label><input type="radio" name="mode" value="shadow" checked> <span><strong>Shadow</strong>Show what would happen, with no playback control.</span></label>
+            <label class="locked"><input type="radio" disabled> <span><strong>Automatic — locked</strong>Requires verified shadow safety and explicit consent.</span></label>
+          </div>
+          <button class="primary" data-action="save-mode">Save mode</button>
+        </article>
+
+        <article class="panel" data-step="calibration">
+          <p class="kicker">06 / Optional calibration</p>
+          <h2>Visual calibration needs real preview evidence.</h2>
+          <p>The software contract is ready, but this build does not fabricate crop or black-frame calibration from a static browser preview. Skip with a recorded reason and revisit after the capture preview job is implemented.</p>
+          <button class="secondary" data-action="skip-calibration">Skip calibration for now</button>
+        </article>
+
+        <article class="panel" data-step="readiness">
+          <p class="kicker">07 / Readiness</p>
+          <h2>Check what is actually available.</h2>
+          <p>Readiness verifies selected capture devices and any configured registry model. Optional detectors may remain disabled; missing requirements stay explicit.</p>
+          <button class="primary" data-action="check-readiness">Run readiness check</button>
+          <pre id="readiness-result" class="result" hidden></pre>
+        </article>
+
+        <article class="panel" data-step="shadow">
+          <p class="kicker">08 / Shadow validation</p>
+          <h2>Observe before acting.</h2>
+          <p>A bounded real-capture shadow job must verify queue health, unknown reasons, hypothetical actions, lease behavior, and restoration. That evidence is not yet produced by the browser service, so this gate remains locked.</p>
+          <div class="gate"><span aria-hidden="true">⌁</span><div><strong>Server verification required</strong><p>Use the existing capture-shadow workflow for engineering validation; it does not automatically satisfy this setup gate.</p></div></div>
+        </article>
+
+        <article class="panel" data-step="auto_mute_consent">
+          <p class="kicker">09 / Explicit consent</p>
+          <h2>Automatic mute is not available yet.</h2>
+          <p>This control appears only after a server-verified shadow run, safe absolute-volume capability, and restoration test. Setup progress alone can never enable it.</p>
+          <button class="primary" disabled>Consent unavailable</button>
+        </article>
+
+        <aside class="settings-card" aria-label="Quick configuration">
+          <div>
+            <p class="eyebrow">Configuration</p>
+            <h2>Profiles and advanced controls</h2>
+          </div>
+          <label>Sensitivity profile<select id="profile"><option value="">Choose a profile</option></select></label>
+          <button class="secondary" data-action="apply-profile">Preview and apply</button>
+          <details>
+            <summary>Advanced temporal settings</summary>
+            <div class="form-grid compact">
+              <label>Temporal strategy<select id="temporal-strategy"><option value="hysteresis">Hysteresis</option><option value="sliding_window">Sliding window</option><option value="hmm">Three-state HMM</option></select></label>
+              <label>Evidence deadline (ms)<input id="evidence-deadline" type="number" min="10" max="60000" value="1500"></label>
+            </div>
+            <button class="secondary" data-action="save-advanced">Apply advanced settings</button>
+          </details>
+          <button class="quiet" data-action="download-diagnostics">Download redacted diagnostics</button>
+          <p id="config-meta" class="meta"></p>
+        </aside>
+      </section>
+    </main>
+    <script src="/static/setup.js" defer></script>
+  </body>
+</html>

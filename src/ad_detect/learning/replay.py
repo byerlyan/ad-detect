@@ -10,10 +10,21 @@ from dataclasses import dataclass
 from itertools import pairwise
 from statistics import fmean
 
-from ad_detect.config.settings import DetectionSettings, RuleSettings
+from ad_detect.config.settings import (
+    CaptureSettings,
+    DetectionSettings,
+    RuleSettings,
+    TemporalSettings,
+)
 from ad_detect.detectors import RulesDetector
-from ad_detect.domain import CaptureHealth, Classification, FeatureWindow, LabelRevision
-from ad_detect.temporal import HysteresisFusion
+from ad_detect.domain import (
+    CaptureHealth,
+    Classification,
+    FeatureWindow,
+    LabelRevision,
+    TemporalStrategy,
+)
+from ad_detect.temporal import TemporalClassifier, build_temporal_classifier
 
 _NS_PER_SECOND = 1_000_000_000
 
@@ -76,20 +87,27 @@ class RulesReplayEvaluator:
         feature_schema: str,
         stale_after_ms: float = 1500.0,
         max_av_skew_ms: float = 150.0,
+        temporal: TemporalSettings | None = None,
+        strategy: TemporalStrategy | None = None,
     ) -> None:
         self._detector = RulesDetector(rules, feature_schema=feature_schema)
         self._detection = detection
         self._stale_after_ms = stale_after_ms
         self._max_av_skew_ms = max_av_skew_ms
+        selected_temporal = temporal or TemporalSettings()
+        if strategy is not None:
+            selected_temporal = selected_temporal.model_copy(update={"strategy": strategy})
+        self._temporal = selected_temporal
 
-    def _fusion(self) -> HysteresisFusion:
-        return HysteresisFusion(
-            enter_threshold=self._detection.enter_threshold,
-            exit_threshold=self._detection.exit_threshold,
-            enter_ticks=self._detection.enter_ticks,
-            exit_ticks=self._detection.exit_ticks,
-            stale_after_ms=self._stale_after_ms,
-            max_av_skew_ms=self._max_av_skew_ms,
+    def _fusion(self) -> TemporalClassifier:
+        return build_temporal_classifier(
+            self._temporal.strategy,
+            self._detection,
+            self._temporal,
+            CaptureSettings(
+                stale_after_ms=round(self._stale_after_ms),
+                max_av_skew_ms=round(self._max_av_skew_ms),
+            ),
         )
 
     async def evaluate(
@@ -100,7 +118,7 @@ class RulesReplayEvaluator:
         wall_started = time.perf_counter()
         cpu_started = time.process_time()
         predictions: list[ReplayPrediction] = []
-        fusion: HysteresisFusion | None = None
+        fusion: TemporalClassifier | None = None
         current_session: str | None = None
 
         for window in sorted(windows, key=lambda item: (item.session_id, item.start_ns)):
@@ -134,7 +152,7 @@ class RulesReplayEvaluator:
                 )
             )
 
-        metrics = _metrics(
+        metrics = replay_metrics(
             predictions,
             labels,
             wall_seconds=time.perf_counter() - wall_started,
@@ -143,7 +161,7 @@ class RulesReplayEvaluator:
         return ReplayResult(tuple(predictions), metrics)
 
 
-def _metrics(
+def replay_metrics(
     predictions: Sequence[ReplayPrediction],
     labels: Sequence[LabelRevision],
     *,

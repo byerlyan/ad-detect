@@ -16,37 +16,9 @@ from ad_detect.domain import (
     feature_values,
 )
 
+from .audio import mono_audio
+
 FloatArray = npt.NDArray[np.float32]
-
-
-def _mono_audio(chunk: AudioChunk) -> FloatArray:
-    dtypes: dict[str, tuple[npt.DTypeLike, float, float]] = {
-        "u8": (np.uint8, 128.0, 128.0),
-        "u8p": (np.uint8, 128.0, 128.0),
-        "s16": (np.dtype("<i2"), 0.0, 32768.0),
-        "s16p": (np.dtype("<i2"), 0.0, 32768.0),
-        "s32": (np.dtype("<i4"), 0.0, 2_147_483_648.0),
-        "s32p": (np.dtype("<i4"), 0.0, 2_147_483_648.0),
-        "flt": (np.dtype("<f4"), 0.0, 1.0),
-        "fltp": (np.dtype("<f4"), 0.0, 1.0),
-        "dbl": (np.dtype("<f8"), 0.0, 1.0),
-        "dblp": (np.dtype("<f8"), 0.0, 1.0),
-    }
-    encoding = dtypes.get(chunk.sample_format)
-    if encoding is None or chunk.channels < 1:
-        raise ValueError(f"unsupported audio format {chunk.sample_format!r}")
-    dtype, offset, scale = encoding
-    samples = np.frombuffer(chunk.pcm, dtype=dtype)
-    usable = samples.size - samples.size % chunk.channels
-    if usable == 0:
-        raise ValueError("audio chunk contains no complete samples")
-    samples = samples[:usable].astype(np.float32)
-    if chunk.sample_format.endswith("p"):
-        channel_samples = samples.reshape(chunk.channels, -1)
-        mono = channel_samples.mean(axis=0)
-    else:
-        mono = samples.reshape(-1, chunk.channels).mean(axis=1)
-    return np.asarray((mono - offset) / scale, dtype=np.float32)
 
 
 def _aggregate(
@@ -78,7 +50,7 @@ class ClassicalFeatureExtractor:
         self._previous_video_histogram = None
 
     def _audio_features(self, chunks: tuple[AudioChunk, ...]) -> dict[str, float]:
-        mono_chunks = [_mono_audio(chunk) for chunk in chunks]
+        mono_chunks = [mono_audio(chunk) for chunk in chunks]
         mono = np.concatenate(mono_chunks)
         absolute = np.abs(mono)
         rms = float(np.sqrt(np.mean(np.square(mono, dtype=np.float64))))

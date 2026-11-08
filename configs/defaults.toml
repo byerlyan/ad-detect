@@ -30,6 +30,45 @@ rapid_cut_rate = 0.35
 high_edge_density = 0.18
 commercial_threshold = 0.70
 
+[fingerprint]
+version = "landmark-v1"
+sample_rate_hz = 16000
+fft_size = 1024
+hop_size = 256
+peaks_per_frame = 1
+peak_time_radius = 4
+peak_percentile = 75.0
+fanout = 3
+target_min_frames = 2
+target_max_frames = 80
+minimum_duration_seconds = 3.0
+query_window_seconds = 5.0
+minimum_landmarks = 30
+minimum_landmarks_per_second = 5.0
+minimum_unique_hashes = 20
+minimum_frequency_bins = 32
+offset_bin_ms = 32
+minimum_aligned_hashes = 12
+minimum_aligned_ratio = 0.08
+maximum_offset_dispersion_ms = 45.0
+minimum_runner_up_margin = 1.5
+minimum_confidence = 0.65
+continuity_ticks = 2
+continuity_position_tolerance_ms = 1500
+
+[ml]
+enabled = false
+aggregation_schema = "aggregate-v1"
+inference_timeout_ms = 200
+use_registry = false
+
+[temporal]
+strategy = "hysteresis"
+evidence_deadline_ms = 1500
+sliding_window_ticks = 5
+sliding_decay = 0.8
+hmm_stay_probability = 0.92
+
 [detection]
 tick_interval_ms = 1000
 enter_threshold = 0.85
@@ -38,6 +77,8 @@ enter_ticks = 3
 exit_ticks = 2
 maximum_mute_seconds = 300
 reentry_cooldown_seconds = 10
+mute_lease_ms = 3000
+watchdog_interval_ms = 250
 
 [intervention]
 mode = "shadow"

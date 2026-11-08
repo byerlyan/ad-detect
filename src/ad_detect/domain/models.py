@@ -27,6 +27,12 @@ class OperatingMode(StrEnum):
     AUTOMATIC = "automatic"
 
 
+class TemporalStrategy(StrEnum):
+    HYSTERESIS = "hysteresis"
+    SLIDING_WINDOW = "sliding_window"
+    HMM = "hmm"
+
+
 def _validate_probabilities(values: Mapping[Classification, float]) -> None:
     expected = set(Classification)
     if set(values) != expected:
@@ -107,6 +113,7 @@ class TemporalState:
     commercial_ticks: int
     program_ticks: int
     reasons: tuple[str, ...] = ()
+    evidence_versions: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         _validate_probabilities(self.probabilities)

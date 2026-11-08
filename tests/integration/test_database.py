@@ -90,3 +90,6 @@ def test_v1_database_is_migrated_without_losing_events(tmp_path: Path) -> None:
             created_at_ns=2,
         )
         assert store.labels(effective_only=True) == [label]
+        assert store.fingerprints() == []
+        assert store.evaluation_runs() == []
+        assert store.registered_models() == []

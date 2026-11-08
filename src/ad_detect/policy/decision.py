@@ -93,4 +93,5 @@ class ConservativeDecisionPolicy:
             action=action,
             reasons=tuple(dict.fromkeys(reasons)),
             expires_ns=temporal.at_ns + self._ttl_ns,
+            evidence_versions=temporal.evidence_versions,
         )

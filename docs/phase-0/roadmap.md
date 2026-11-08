@@ -149,6 +149,11 @@ Acceptance criteria:
   and fingerprint version;
 - index query meets live latency/resource budget at the measured catalog size.
 
+Status: software baseline, passive live scanning, management, and causal replay
+are implemented; representative real captures, negative-session thresholding,
+codec/variant tests, and target-hardware catalog profiling remain pending. See
+[Phase 4 status](../phase-4/README.md).
+
 ## Phase 5 — ML inference
 
 Depends on: Phase 3 dataset/replay; meaningful acceptance requires enough labeled
@@ -173,6 +178,12 @@ Acceptance criteria:
 - optional embeddings enter the default only after clean-install, resource, and
   held-out gain gates pass.
 
+Status: software baseline, immutable inactive bundles, passive live inference,
+and causal comparison reporting are implemented. Representative labeled
+recordings, unseen-session candidate results, calibration reliability,
+target-hardware profiling, and model selection remain pending. See
+[Phase 5 status](../phase-5/README.md).
+
 ## Phase 6 — Temporal fusion and decision policy
 
 Depends on: Phases 3, 4, and 5 (components may be absent but their interfaces
@@ -196,6 +207,12 @@ Acceptance criteria:
 - explanations identify evidence contributions and hard gates;
 - shadow soak precedes any automatic action.
 
+Status: the three causal temporal strategies, evidence deadlines, explanations,
+manual override, conservative policy, mute lease, and watchdog restoration are
+implemented and tested. Hysteresis remains the default because representative
+unseen-session comparison and a sustained target-hardware shadow soak remain
+pending. See [Phase 6 status](../phase-6/README.md).
+
 ## Phase 7 — Training and evaluation
 
 Depends on: Phases 3-6.
@@ -218,13 +235,20 @@ Acceptance criteria:
 - activation is explicit, authenticated, audited, reversible, and rejects
   incompatible feature schemas.
 
+Status: immutable evaluation runs, final-test locking, baseline JSON/HTML
+reports, schema-v5 registry persistence, inactive registration, and authorized
+activation/rollback services are implemented. Full detector-matrix replay,
+richer plots, target-host profiling, production authentication, and
+representative held-out acceptance remain. See
+[Phase 7 status and plan](../phase-7/README.md).
+
 ## Phase 8 — Guided setup and configuration UI
 
 Depends on: Phases 1-3 and model/registry APIs from Phase 7 where applicable.
 
 Scope:
 
-- resumable setup state machine and eight-step browser workflow;
+- resumable setup state machine and nine-step browser workflow;
 - Basic/Advanced validated settings and sensitivity profiles;
 - capture previews/tests, pairing, calibration, readiness, shadow validation,
   explicit automatic-mute consent;
@@ -239,6 +263,8 @@ Acceptance criteria:
 - automatic mute cannot enable before readiness, shadow validation, safety
   capability, and explicit consent;
 - malformed/unsafe settings are rejected transactionally with actionable errors.
+
+Status: planned. See [Phase 8 plan](../phase-8/README.md).
 
 ## Phase 9 — Mobile dashboard
 
@@ -259,6 +285,8 @@ Acceptance criteria:
 - all state changes require authenticated, CSRF-protected requests;
 - credentials/secrets are never sent to the browser;
 - LAN threat review and local-network setup documentation are complete.
+
+Status: planned. See [Phase 9 plan](../phase-9/README.md).
 
 ## Phase 10 — Reliability and optimization
 
@@ -283,6 +311,9 @@ Acceptance criteria:
 - install/upgrade/rollback/backup recovery are tested on the target OS;
 - known limitations, HDCP behavior, privacy defaults, and unsupported volume
   configurations are explicit in release documentation.
+
+Status: planned and hardware/data gated. See
+[Phase 10 plan](../phase-10/README.md).
 
 ## Cross-phase definition of done
 
