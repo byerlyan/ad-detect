@@ -122,9 +122,10 @@ Acceptance criteria:
   accuracy claim until representative labels exist;
 - capture gaps and queue drops appear as `UNKNOWN`/diagnostic events.
 
-Status: software components and causal replay are implemented; live capture
-composition, representative labels, and target-hardware acceptance remain
-pending. See [Phase 3 status](../phase-3/README.md).
+Status: software components, causal replay, and live shadow composition are
+implemented; representative labels, encoded transition retention, and
+target-hardware acceptance remain pending. See
+[Phase 3 status](../phase-3/README.md).
 
 ## Phase 4 — Fingerprinting
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from ad_detect.capture import CaptureHealthMonitor, MediaHealthConsumer, MediaRecord
 from ad_detect.domain import AudioChunk, SynchronizedWindow, VideoFrame
 
@@ -23,21 +25,33 @@ class WindowAssembler:
         self._start_ns: int | None = None
         self._audio: list[AudioChunk] = []
         self._video: list[VideoFrame] = []
+        self._gap_reasons: list[str] = []
+
+    def mark_gap(self, reason: str) -> None:
+        if reason and reason not in self._gap_reasons:
+            self._gap_reasons.append(reason)
 
     def _emit(self) -> SynchronizedWindow:
         if self._start_ns is None:
             raise RuntimeError("window assembler has not started")
         end_ns = self._start_ns + self.duration_ns
+        health = self._health.snapshot(end_ns)
+        if self._gap_reasons:
+            health = replace(
+                health,
+                reasons=tuple(dict.fromkeys((*health.reasons, *self._gap_reasons))),
+            )
         result = SynchronizedWindow(
             session_id=self.session_id,
             start_ns=self._start_ns,
             end_ns=end_ns,
             audio=tuple(self._audio),
             video=tuple(self._video),
-            health=self._health.snapshot(end_ns),
+            health=health,
         )
         self._audio.clear()
         self._video.clear()
+        self._gap_reasons.clear()
         self._start_ns = end_ns
         return result
 

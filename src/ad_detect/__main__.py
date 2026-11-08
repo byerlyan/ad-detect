@@ -8,14 +8,15 @@ import json
 import time
 from dataclasses import asdict
 from pathlib import Path
+from uuid import uuid4
 
 from ad_detect.api import create_app
-from ad_detect.app import DetectionRuntime
-from ad_detect.capture import SimulatedCapture
+from ad_detect.app import DetectionRuntime, LiveShadowPipeline
+from ad_detect.capture import CaptureSupervisor, SimulatedCapture
 from ad_detect.capture.ffmpeg import FFmpegAVFoundation
 from ad_detect.config import load_settings
 from ad_detect.data import SQLiteStore
-from ad_detect.domain import BoundaryKind, Classification
+from ad_detect.domain import BoundaryKind, Classification, OperatingMode
 from ad_detect.learning import RulesReplayEvaluator, export_dataset, import_dataset
 from ad_detect.observability import configure_logging
 
@@ -160,6 +161,81 @@ async def _rules_replay(config_path: Path, session_id: str | None) -> int:
     return 0
 
 
+async def _capture_shadow(config_path: Path, session_id: str | None) -> int:
+    settings = load_settings(config_path)
+    resolved_session = session_id or f"capture-{uuid4().hex}"
+    adapter = FFmpegAVFoundation(settings.capture)
+    video, audio = await adapter.selected_devices()
+    source = CaptureSupervisor(
+        adapter,
+        session_id=resolved_session,
+        queue_capacity=settings.capture.queue_capacity,
+    )
+    with SQLiteStore(settings.storage.database_path) as store:
+        config_digest = store.save_config_revision(
+            settings.model_dump(mode="json"), created_at_ns=time.time_ns()
+        )
+        store.append_event(
+            session_id=resolved_session,
+            at_ns=time.monotonic_ns(),
+            kind="session.started",
+            payload={
+                "config_digest": config_digest,
+                "capture_source": "ffmpeg-avfoundation",
+                "video_device": video.key,
+                "audio_device": audio.key,
+                "feature_schema": settings.features.schema_version,
+                "rules_version": settings.rules.version,
+                "operating_mode": OperatingMode.SHADOW.value,
+            },
+        )
+        pipeline = LiveShadowPipeline(
+            settings,
+            store,
+            session_id=resolved_session,
+            source=source,
+        )
+        try:
+            await pipeline.start()
+            await pipeline.wait()
+        finally:
+            await pipeline.stop()
+        snapshot = pipeline.snapshot()
+        store.append_event(
+            session_id=resolved_session,
+            at_ns=time.monotonic_ns(),
+            kind="session.stopped",
+            payload={
+                "records_processed": snapshot.records_processed,
+                "windows_processed": snapshot.windows_processed,
+                "queue_drops": snapshot.queue_drops,
+                "capture_restarts": snapshot.capture_restarts,
+                "capture_error": snapshot.capture_error or "",
+                "processing_error": snapshot.processing_error or "",
+            },
+        )
+    print(
+        json.dumps(
+            {
+                "session_id": resolved_session,
+                "records_processed": snapshot.records_processed,
+                "windows_processed": snapshot.windows_processed,
+                "queue_drops": snapshot.queue_drops,
+                "capture_restarts": snapshot.capture_restarts,
+                "capture_error": snapshot.capture_error,
+                "processing_error": snapshot.processing_error,
+                "last_classification": (
+                    snapshot.last_decision.classification.value
+                    if snapshot.last_decision is not None
+                    else None
+                ),
+            },
+            sort_keys=True,
+        )
+    )
+    return 2 if snapshot.capture_error or snapshot.processing_error else 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="ad-detect")
     parser.add_argument("--config", type=Path, default=Path("configs/defaults.toml"))
@@ -197,6 +273,11 @@ def main() -> int:
     dataset_import.add_argument("manifest", type=Path)
     replay = subparsers.add_parser("rules-replay", help="evaluate the causal rules baseline")
     replay.add_argument("--session")
+    capture_shadow = subparsers.add_parser(
+        "capture-shadow",
+        help="run FFmpeg capture through rules without controlling playback",
+    )
+    capture_shadow.add_argument("--session")
     args = parser.parse_args()
     configure_logging()
     if args.command == "simulate":
@@ -226,6 +307,8 @@ def main() -> int:
         return _import_dataset(args.config, args.manifest)
     if args.command == "rules-replay":
         return asyncio.run(_rules_replay(args.config, args.session))
+    if args.command == "capture-shadow":
+        return asyncio.run(_capture_shadow(args.config, args.session))
 
     settings = load_settings(args.config)
     import uvicorn

@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from ad_detect.capture.simulated import SimulatedTick
 from ad_detect.config import Settings
 from ad_detect.data import SQLiteStore
-from ad_detect.domain import Decision, RecommendedAction, TemporalState
+from ad_detect.domain import (
+    CaptureHealth,
+    Decision,
+    DetectorEvidence,
+    RecommendedAction,
+    TemporalState,
+)
 from ad_detect.intervention import SimulatedIntervention
 from ad_detect.policy import ConservativeDecisionPolicy
 from ad_detect.ports import DesiredAudioState, InterventionPort
@@ -88,9 +95,16 @@ class DetectionRuntime:
         await self.intervention.disconnect()
 
     async def process_tick(self, tick: SimulatedTick) -> Decision:
+        return await self.process_evidence(tick.evidence, tick.health)
+
+    async def process_evidence(
+        self,
+        evidence: Sequence[DetectorEvidence],
+        health: CaptureHealth,
+    ) -> Decision:
         if not self._running:
             raise RuntimeError("runtime is not running")
-        temporal = self.fusion.update(tick.evidence, tick.health)
+        temporal = self.fusion.update(evidence, health)
         decision = self.policy.decide(
             temporal,
             mode=self.settings.intervention.mode,

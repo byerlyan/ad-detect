@@ -15,8 +15,9 @@ Phase 2 software adapters for FFmpeg/AVFoundation and pyatv are implemented and
 mock-tested, but remain hardware-unvalidated. Phase 3 now adds versioned
 classical A/V features, an explainable rules baseline, causal replay metrics,
 append-only labels, label-safe artifact retention, and immutable dataset
-export/import. The real capture-to-rules runtime is not wired or hardware
-accepted yet.
+export/import. A live FFmpeg-to-rules shadow runtime is wired and mock-tested;
+it is deliberately unable to control Apple TV playback. Real capture hardware
+and detection accuracy remain unvalidated.
 
 ## Development quick start
 
@@ -28,6 +29,8 @@ python3.11 -m venv .venv
 .venv/bin/python -m pytest
 .venv/bin/ad-detect simulate
 .venv/bin/ad-detect serve
+# After selecting and probing real capture devices:
+.venv/bin/ad-detect capture-shadow --session recording-001
 ```
 
 The local dashboard defaults to <http://127.0.0.1:8765>. The default operating

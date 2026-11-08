@@ -42,11 +42,21 @@ def export_dataset(
         features = [item for item in features if item.session_id in session_ids]
         labels = [item for item in labels if item.session_id in session_ids]
     sessions = sorted({item.session_id for item in features} | {item.session_id for item in labels})
+    session_metadata = [
+        {
+            "session_id": session_id,
+            "started": event.payload,
+        }
+        for session_id in sessions
+        for event in store.timeline(session_id=session_id, limit=10_000)
+        if event.kind == "session.started"
+    ]
     payload: dict[str, Any] = {
         "format_version": 1,
         "created_at_ns": created_at_ns,
         "provenance": dict(sorted((provenance or {}).items())),
         "sessions": sessions,
+        "session_metadata": session_metadata,
         "feature_windows": [
             {
                 "schema_version": item.schema_version,

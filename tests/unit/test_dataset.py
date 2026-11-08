@@ -9,6 +9,12 @@ from ad_detect.learning import export_dataset, import_dataset, load_dataset_mani
 
 def test_dataset_export_is_deterministic_and_hash_verified(tmp_path: Path) -> None:
     with SQLiteStore(":memory:") as store:
+        store.append_event(
+            session_id="s",
+            at_ns=0,
+            kind="session.started",
+            payload={"config_digest": "original", "video_device": "video:1:test"},
+        )
         store.save_feature_window(
             FeatureWindow(
                 schema_version="classical-v1",
@@ -46,6 +52,15 @@ def test_dataset_export_is_deterministic_and_hash_verified(tmp_path: Path) -> No
         assert first.digest == second.digest
         assert load_dataset_manifest(first.path).payload == first.payload
         assert first.payload["provenance"] == {"config_digest": "abc"}
+        assert first.payload["session_metadata"] == [
+            {
+                "session_id": "s",
+                "started": {
+                    "config_digest": "original",
+                    "video_device": "video:1:test",
+                },
+            }
+        ]
 
         with SQLiteStore(":memory:") as imported:
             import_dataset(imported, first.path)

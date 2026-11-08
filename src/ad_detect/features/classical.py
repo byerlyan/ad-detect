@@ -72,6 +72,11 @@ class ClassicalFeatureExtractor:
         self._previous_audio_spectrum: FloatArray | None = None
         self._previous_video_histogram: FloatArray | None = None
 
+    def reset(self) -> None:
+        """Clear temporal feature history after a capture discontinuity."""
+        self._previous_audio_spectrum = None
+        self._previous_video_histogram = None
+
     def _audio_features(self, chunks: tuple[AudioChunk, ...]) -> dict[str, float]:
         mono_chunks = [_mono_audio(chunk) for chunk in chunks]
         mono = np.concatenate(mono_chunks)

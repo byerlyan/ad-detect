@@ -46,3 +46,18 @@ def test_flush_is_causal_and_does_not_emit_partial_window() -> None:
     assembler.push(AudioChunk(stamp(0, 100), 48_000, 2, "s16", bytes(400)))
     assert assembler.flush(999_999_999) == ()
     assert len(assembler.flush(1_000_000_000)) == 1
+
+
+def test_marked_queue_gap_invalidates_the_next_completed_window() -> None:
+    assembler = WindowAssembler(
+        session_id="session",
+        duration_ns=1_000_000_000,
+        health_monitor=CaptureHealthMonitor(stale_after_ms=1500, max_av_skew_ms=150),
+    )
+    assembler.push(AudioChunk(stamp(0, 100), 48_000, 2, "s16", bytes(400)))
+    assembler.mark_gap("queue overflow")
+
+    window = assembler.push(VideoFrame(stamp(1, 1_000_000_000), 1, 1, "bgr24", b"\x10\x10\x10"))[0]
+
+    assert "queue overflow" in window.health.reasons
+    assert not window.health.valid

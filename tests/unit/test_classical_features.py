@@ -83,6 +83,20 @@ def test_spectral_flux_and_scene_cut_use_previous_window() -> None:
     assert second.values["video.scene_cut.max"] > 0.9
     assert second.values["video.scene_cut_flag.mean"] == 1.0
 
+    extractor.reset()
+    after_gap = extractor.extract(
+        SynchronizedWindow(
+            "session",
+            2,
+            3,
+            (audio_chunk(quiet, sequence=2),),
+            (video_frame(dark, sequence=2),),
+            healthy(),
+        )
+    )
+    assert after_gap.values["audio.spectral_flux"] == 0.0
+    assert after_gap.values["video.scene_cut.max"] == 0.0
+
 
 def test_invalid_capture_marks_features_missing_without_inventing_values() -> None:
     health = CaptureHealth(
