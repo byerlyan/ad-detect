@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ad-detect"
+version = "0.1.0"
+description = "Local-first real-time television advertisement detection"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+# Provisional until the project owner selects a distribution license.
+license = "LicenseRef-Proprietary"
+authors = [{ name = "Ad Detect contributors" }]
+dependencies = [
+  "fastapi>=0.115,<1",
+  "numpy>=1.24,<3",
+  "pydantic>=2.10,<3",
+  "uvicorn[standard]>=0.30,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.27,<1",
+  "mypy>=1.11,<2",
+  "pyatv==0.18.0",
+  "pytest>=7.2,<9",
+  "pytest-asyncio>=0.21,<1",
+  "ruff>=0.8,<1",
+  "uv>=0.8,<1",
+]
+capture = [
+  "av>=14,<17",
+]
+appletv = [
+  "pyatv==0.18.0",
+]
+ml = [
+  "opencv-python-headless>=4.8,<5",
+  "scikit-learn>=1.3,<2",
+  "scipy>=1.10,<2",
+]
+ml-onnx-monterey = [
+  "onnxruntime==1.19.2; platform_system == 'Darwin' and platform_machine == 'x86_64'",
+]
+
+[project.scripts]
+ad-detect = "ad_detect.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ad_detect = ["api/static/*.html"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+pythonpath = ["src"]
+filterwarnings = [
+  "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["ad_detect"]
+
+[[tool.mypy.overrides]]
+module = ["av", "av.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+branch = true
+source = ["ad_detect"]
+

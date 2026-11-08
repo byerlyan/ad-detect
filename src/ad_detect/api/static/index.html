@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark light">
+    <title>Ad Detect</title>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #11151b; color: #edf2f7; }
+      body { margin: 0; padding: 1rem; }
+      main { max-width: 56rem; margin: auto; }
+      h1 { font-size: clamp(1.8rem, 7vw, 3rem); margin-bottom: .25rem; }
+      .muted { color: #9aa7b5; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .8rem; margin-top: 1.5rem; }
+      .card { background: #1b222c; border: 1px solid #303b49; border-radius: .8rem; padding: 1rem; min-height: 6rem; }
+      .label { color: #9aa7b5; font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; }
+      .value { font-size: 1.45rem; font-weight: 700; margin-top: .45rem; word-break: break-word; }
+      .unknown { color: #f7c873; } .program { color: #65d6a6; } .commercial { color: #ff8080; }
+      @media (max-width: 420px) { body { padding: .75rem; } .card { min-height: 5rem; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Ad Detect</h1>
+      <div class="muted">Phase 1 local dashboard shell</div>
+      <section class="grid" aria-live="polite">
+        <article class="card"><div class="label">Runtime</div><div id="runtime" class="value">Loading…</div></article>
+        <article class="card"><div class="label">Classification</div><div id="classification" class="value unknown">Unknown</div></article>
+        <article class="card"><div class="label">Audio state</div><div id="audio" class="value">Restored</div></article>
+        <article class="card"><div class="label">Ticks processed</div><div id="ticks" class="value">0</div></article>
+      </section>
+    </main>
+    <script>
+      const title = value => value ? value.replaceAll('_', ' ') : 'unknown';
+      async function refresh() {
+        try {
+          const response = await fetch('/api/v1/state', { cache: 'no-store' });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const state = await response.json();
+          document.querySelector('#runtime').textContent = state.running ? 'Running' : 'Stopped';
+          const kind = state.temporal?.classification || 'unknown';
+          const node = document.querySelector('#classification');
+          node.textContent = title(kind);
+          node.className = `value ${kind}`;
+          document.querySelector('#audio').textContent = title(state.audio_state);
+          document.querySelector('#ticks').textContent = state.ticks_processed;
+        } catch (error) {
+          document.querySelector('#runtime').textContent = 'Disconnected';
+        }
+      }
+      refresh(); setInterval(refresh, 1000);
+    </script>
+  </body>
+</html>
+

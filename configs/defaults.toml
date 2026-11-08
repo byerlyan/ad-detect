@@ -1,0 +1,59 @@
+[application]
+name = "Ad Detect"
+environment = "development"
+
+[capture]
+source = "simulated"
+queue_capacity = 8
+stale_after_ms = 1500
+max_av_skew_ms = 150
+ffmpeg_path = "ffmpeg"
+video_device = ""
+audio_device = ""
+width = 1280
+height = 720
+frame_rate = 30.0
+sample_rate_hz = 48000
+channels = 2
+probe_seconds = 2.0
+
+[features]
+schema_version = "classical-v1"
+silence_amplitude = 0.01
+scene_cut_threshold = 0.35
+
+[rules]
+version = "rules-v1"
+high_rms = 0.18
+high_spectral_flux = 0.20
+rapid_cut_rate = 0.35
+high_edge_density = 0.18
+commercial_threshold = 0.70
+
+[detection]
+tick_interval_ms = 1000
+enter_threshold = 0.85
+exit_threshold = 0.65
+enter_ticks = 3
+exit_ticks = 2
+maximum_mute_seconds = 300
+reentry_cooldown_seconds = 10
+
+[intervention]
+mode = "shadow"
+automatic_muting = false
+adapter = "simulated"
+device_id = ""
+credentials_path = "var/pyatv.conf"
+discovery_timeout_seconds = 5.0
+
+[storage]
+database_path = "var/ad-detect.sqlite3"
+artifact_path = "var/artifacts"
+rolling_buffer_seconds = 90
+artifact_quota_bytes = 1073741824
+
+[server]
+host = "127.0.0.1"
+port = 8765
+
